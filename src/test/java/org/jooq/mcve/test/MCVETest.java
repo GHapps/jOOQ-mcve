@@ -64,7 +64,10 @@ public class MCVETest {
         DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
         //NOTE!
         //Comment out the below line when using Jooq 3.9.1 to see original behaviour.
-        jooqConfiguration.setExecuteListener(new StopWatchListener());
+        //The StopWatchListener has a stop watch per listener instance. If there is only one listener for all queries,
+        //it will always use the same stop watch on every thread and for every query execution. It is better to
+        //create a new StopWatchListener per query execution, by wrapping it in an ExecuteListenerProvider
+        jooqConfiguration.setExecuteListenerProvider(StopWatchListener::new);
         jooqConfiguration.setConnection(connection);
         ctx = DSL.using(jooqConfiguration);
     }
