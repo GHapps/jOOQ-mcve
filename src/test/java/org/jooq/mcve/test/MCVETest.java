@@ -45,8 +45,10 @@ import java.sql.DriverManager;
 
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
+import org.jooq.impl.DefaultConfiguration;
 import org.jooq.mcve.tables.records.TestRecord;
 
+import org.jooq.tools.StopWatchListener;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -59,7 +61,12 @@ public class MCVETest {
     @Before
     public void setup() throws Exception {
         connection = DriverManager.getConnection("jdbc:h2:~/mcve", "sa", "");
-        ctx = DSL.using(connection);
+        DefaultConfiguration jooqConfiguration = new DefaultConfiguration();
+        //NOTE!
+        //Comment out the below line when using Jooq 3.9.1 to see original behaviour.
+        jooqConfiguration.setExecuteListener(new StopWatchListener());
+        jooqConfiguration.setConnection(connection);
+        ctx = DSL.using(jooqConfiguration);
     }
 
     @After
@@ -69,16 +76,60 @@ public class MCVETest {
         connection = null;
     }
 
+
     @Test
-    public void mcveTest() {
+    public void mcveTest3_11_10() throws InterruptedException {
+        //Quite crude, but you will see that the sleeps here are added to the "Finishing" log outputs in a cumulative fashion for the entire test run.
+        //i.e. here we have a 10second wait, below we have a 5 second wait. The last Finishing entry will be 15 seconds plus.
+        //
+        Thread.sleep(10000);
         TestRecord result =
-        ctx.insertInto(TEST)
-           .columns(TEST.VALUE)
-           .values(42)
-           .returning(TEST.ID)
-           .fetchOne();
+                ctx.insertInto(TEST)
+                        .columns(TEST.VALUE)
+                        .values(42)
+                        .returning(TEST.ID)
+                        .fetchOne();
 
         result.refresh();
         assertEquals(42, (int) result.getValue());
+
+        //second query execution, you should see a log in the output like:
+        //13:36:04,762 DEBUG [org.jooq.tools.StopWatch                          ] - Finishing                : Total: 15.506s, +0.806ms
+        Thread.sleep(5000);
+        TestRecord result2 =
+                ctx.insertInto(TEST)
+                        .columns(TEST.VALUE)
+                        .values(42)
+                        .returning(TEST.ID)
+                        .fetchOne();
+
+        result2.refresh();
+        assertEquals(42, (int) result2.getValue());
     }
+
+//    @Test
+//    public void mcveTest3_9_1() throws InterruptedException {
+//        //in 3.9.1 you will see no such cumulative behaviour of the "Finishing" times log entries
+//        //
+//        Thread.sleep(10000);
+//        TestRecord result =
+//                ctx.insertInto(TEST)
+//                        .columns(TEST.VALUE)
+//                        .values(42)
+//                        .returning(TEST.ID)
+//                        .fetchOne();
+//
+//
+//        Thread.sleep(5000);
+//        TestRecord result2 =
+//                ctx.insertInto(TEST)
+//                        .columns(TEST.VALUE)
+//                        .values(42)
+//                        .returning(TEST.ID)
+//                        .fetchOne();
+//
+//
+//    }
+
 }
+
